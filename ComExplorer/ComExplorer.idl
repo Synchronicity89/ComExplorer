@@ -1,0 +1,18 @@
+// ComExplorer.idl : IDL source for ComExplorer
+//
+
+// This file will be processed by the MIDL tool to
+// produce the type library (ComExplorer.tlb) and marshalling code.
+
+import "oaidl.idl";
+import "ocidl.idl";
+
+[
+	uuid(00c8a28a-f581-4b00-8663-bdb995221441),
+	version(1.0),
+]
+library ComExplorerLib
+{
+	importlib("stdole2.tlb");
+};
+
