@@ -19,6 +19,9 @@ using namespace ATL;
 #define IDC_BTN_INVOKE     105
 #define IDC_EDIT_OUTPUT    106
 #define IDC_PANEL          107
+#define IDC_BTN_LIST_MEMBERS 108
+#define IDC_LIST_MEMBERS     109
+
 
 // Structure to hold basic information about a COM object for testing.
 struct ComObjectInfo {
@@ -46,6 +49,8 @@ HWND hButtonCreate = NULL;
 HWND hButtonInvoke = NULL;
 HWND hEditOutput = NULL;
 HWND hPanel = NULL;
+HWND hButtonListMembers = NULL;
+HWND hListMembers = NULL;
 
 // Global COM pointer for storing the automation object’s IDispatch interface.
 CComPtr<IDispatch> g_pDispatch;
@@ -261,6 +266,18 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             WS_CHILD | WS_VISIBLE | SS_WHITERECT,
             330, 10, 400, 330,
             hWnd, (HMENU)IDC_PANEL, g_hInst, NULL);
+        // Create a button to list members of the selected COM object.
+        hButtonListMembers = CreateWindow(L"BUTTON", L"List Members",
+            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+            10, 350, 150, 30,
+            hWnd, (HMENU)IDC_BTN_LIST_MEMBERS, g_hInst, NULL);
+
+        // Create a dropdown listbox to display members.
+        hListMembers = CreateWindow(L"COMBOBOX", L"",
+            WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL,
+            170, 350, 310, 150,
+            hWnd, (HMENU)IDC_LIST_MEMBERS, g_hInst, NULL);
+
         break;
     }
     case WM_COMMAND:
@@ -294,6 +311,21 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         else if (wmId == IDC_BTN_INVOKE)
         {
             InvokeDispatchMethod();
+        }
+        // Handle the List Members button.
+        else if (wmId == IDC_BTN_LIST_MEMBERS)
+        {
+            // Clear the dropdown listbox.
+            SendMessage(hListMembers, CB_RESETCONTENT, 0, 0);
+
+            // Add placeholder items (actual member listing will be implemented later).
+            SendMessage(hListMembers, CB_ADDSTRING, 0, (LPARAM)L"Method1()");
+            SendMessage(hListMembers, CB_ADDSTRING, 0, (LPARAM)L"Property1");
+            SendMessage(hListMembers, CB_ADDSTRING, 0, (LPARAM)L"Method2(int param)");
+            SendMessage(hListMembers, CB_ADDSTRING, 0, (LPARAM)L"Property2");
+
+            // Optionally, select the first item.
+            SendMessage(hListMembers, CB_SETCURSEL, 0, 0);
         }
         break;
     }
