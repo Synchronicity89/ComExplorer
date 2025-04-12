@@ -7,6 +7,8 @@
 #include <atlwin.h>
 #include <atlcom.h>
 #include <commctrl.h>
+#include <vector>
+#include "ComObjectInfo.h"
 #pragma comment(lib, "comctl32.lib")
 
 using namespace ATL;
@@ -22,21 +24,10 @@ using namespace ATL;
 #define IDC_BTN_LIST_MEMBERS 108
 #define IDC_LIST_MEMBERS     109
 
+std::vector<ComObjectInfo> g_ComObjects;
 
-// Structure to hold basic information about a COM object for testing.
-struct ComObjectInfo {
-    const wchar_t* displayName; // Friendly name as shown in the list box.
-    const wchar_t* progID;      // ProgID (or CLSID string) used to create the object.
-    bool hasUI;                 // Whether the object has a visual interface.
-};
 
-// For demonstration we hard-code two sample objects.
-ComObjectInfo g_ComObjects[] = {
-    { L"Scripting.Dictionary", L"Scripting.Dictionary", false },
-    { L"Microsoft Web Browser", L"Shell.Explorer", true }
-};
-
-const int g_NumComObjects = sizeof(g_ComObjects) / sizeof(g_ComObjects[0]);
+//const int g_NumComObjects = sizeof(g_ComObjects) / sizeof(g_ComObjects[0]);
 
 // Global variables:
 HINSTANCE g_hInst = NULL;
@@ -96,8 +87,9 @@ void CreateCOMObject(const ComObjectInfo& info, bool useDispatch)
     g_pDispatch.Release();
 
     // Convert the ProgID to a CLSID.
-    CLSID clsid;
-    HRESULT hr = CLSIDFromProgID(info.progID, &clsid);
+    CLSID clsid;// Convert the std::wstring to LPCOLESTR
+    HRESULT hr = CLSIDFromProgID(info.progID.c_str(), &clsid);
+
     if (FAILED(hr))
     {
         MessageBox(NULL, L"Failed to retrieve CLSID from ProgID.", L"Error", MB_OK);
@@ -223,11 +215,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             WS_CHILD | WS_VISIBLE | LBS_STANDARD,
             10, 10, 250, 100,
             hWnd, (HMENU)IDC_LIST_OBJECTS, g_hInst, NULL);
-        // Populate the list box.
-        for (int i = 0; i < g_NumComObjects; i++)
+
+        // Enumerate COM objects and populate the list box.
+        g_ComObjects = EnumerateCOMObjects();
+        for (const auto& obj : g_ComObjects)
         {
-            SendMessage(hList, LB_ADDSTRING, 0, (LPARAM)g_ComObjects[i].displayName);
+            SendMessage(hList, LB_ADDSTRING, 0, (LPARAM)obj.displayName.c_str());
         }
+
+        // Select the first item by default.
         SendMessage(hList, LB_SETCURSEL, 0, 0);
 
         // Create two radio buttons to select call mode.
@@ -266,6 +262,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             WS_CHILD | WS_VISIBLE | SS_WHITERECT,
             330, 10, 400, 330,
             hWnd, (HMENU)IDC_PANEL, g_hInst, NULL);
+
         // Create a button to list members of the selected COM object.
         hButtonListMembers = CreateWindow(L"BUTTON", L"List Members",
             WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
@@ -297,7 +294,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             if (selectedObj.hasUI)
             {
                 // For objects with a UI, instantiate an ActiveX control in the panel.
-                CreateActiveXControl(selectedObj.progID);
+                CreateActiveXControl(selectedObj.progID.c_str());
                     // Add the definition of the CreateActiveXControl function to resolve the undefined identifier error.
             }
             else
