@@ -42,6 +42,7 @@ HWND hEditOutput = NULL;
 HWND hPanel = NULL;
 HWND hButtonListMembers = NULL;
 HWND hListMembers = NULL;
+HWND hCheckboxUIOnly = NULL;
 
 // Global COM pointer for storing the automation object’s IDispatch interface.
 CComPtr<IDispatch> g_pDispatch;
@@ -88,11 +89,19 @@ void CreateCOMObject(const ComObjectInfo& info, bool useDispatch)
 
     // Convert the ProgID to a CLSID.
     CLSID clsid;// Convert the std::wstring to LPCOLESTR
-    HRESULT hr = CLSIDFromProgID(info.progID.c_str(), &clsid);
-
+	//assign a new c string variable with info.progID.c_str()
+    std::wstring progIDws = info.progID;
+    if (!progIDws.empty() && progIDws.front() == L'{' && progIDws.back() == L'}')
+    {
+        progIDws = progIDws.substr(1, progIDws.size() - 2); // Remove the first and last characters.
+    }
+	LPOLESTR progID = const_cast<LPOLESTR>(progIDws.c_str());
+    HRESULT hr = CLSIDFromProgID(progID, &clsid);
     if (FAILED(hr))
     {
-        MessageBox(NULL, L"Failed to retrieve CLSID from ProgID.", L"Error", MB_OK);
+        wchar_t buffer[256];
+        swprintf_s(buffer, L"Failed to retrieve CLSID from ProgID: %s", progID);
+        MessageBox(NULL, buffer, L"Error", MB_OK);
         return;
     }
 
@@ -216,24 +225,36 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             10, 10, 250, 100,
             hWnd, (HMENU)IDC_LIST_OBJECTS, g_hInst, NULL);
 
-        // Enumerate COM objects and populate the list box.
+        // Create a checkbox for "UI Only"
+        hCheckboxUIOnly = CreateWindow(L"BUTTON", L"UI Only",
+            WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
+            10, 130, 100, 20, // Adjusted position to ensure visibility
+            hWnd, (HMENU)110, g_hInst, NULL);
+
+        // Set the checkbox to checked by default
+        SendMessage(hCheckboxUIOnly, BM_SETCHECK, BST_CHECKED, 0);
+
+        // Populate the listbox with "UI Only" COM objects by default
         g_ComObjects = EnumerateCOMObjects();
         for (const auto& obj : g_ComObjects)
         {
-            SendMessage(hList, LB_ADDSTRING, 0, (LPARAM)obj.displayName.c_str());
+            if (obj.hasUI) // Only add UI objects initially
+            {
+                SendMessage(hList, LB_ADDSTRING, 0, (LPARAM)obj.displayName.c_str());
+            }
         }
 
-        // Select the first item by default.
+        // Select the first item by default
         SendMessage(hList, LB_SETCURSEL, 0, 0);
 
         // Create two radio buttons to select call mode.
         hRadioDispatch = CreateWindow(L"BUTTON", L"IDispatch",
             WS_CHILD | WS_VISIBLE | BS_RADIOBUTTON,
-            10, 120, 100, 25,
+            10, 160, 100, 25, // Adjusted position
             hWnd, (HMENU)IDC_RADIO_DISPATCH, g_hInst, NULL);
         hRadioDirect = CreateWindow(L"BUTTON", L"Direct",
             WS_CHILD | WS_VISIBLE | BS_RADIOBUTTON,
-            120, 120, 100, 25,
+            120, 160, 100, 25, // Adjusted position
             hWnd, (HMENU)IDC_RADIO_DIRECT, g_hInst, NULL);
         // Default to using IDispatch.
         SendMessage(hRadioDispatch, BM_SETCHECK, BST_CHECKED, 0);
@@ -242,19 +263,19 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         // Create a button to instantiate the selected COM object.
         hButtonCreate = CreateWindow(L"BUTTON", L"Create Object",
             WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-            10, 150, 150, 30,
+            10, 200, 150, 30, // Adjusted position
             hWnd, (HMENU)IDC_BTN_CREATE, g_hInst, NULL);
 
         // Create a button to invoke a method on the object.
         hButtonInvoke = CreateWindow(L"BUTTON", L"Invoke Method",
             WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-            170, 150, 150, 30,
+            170, 200, 150, 30, // Adjusted position
             hWnd, (HMENU)IDC_BTN_INVOKE, g_hInst, NULL);
 
         // Create an Edit control to display output messages.
         hEditOutput = CreateWindow(L"EDIT", L"",
             WS_CHILD | WS_VISIBLE | WS_BORDER | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY,
-            10, 190, 310, 150,
+            10, 240, 310, 150, // Adjusted position
             hWnd, (HMENU)IDC_EDIT_OUTPUT, g_hInst, NULL);
 
         // Create a panel that will host the ActiveX control (if needed).
@@ -266,13 +287,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         // Create a button to list members of the selected COM object.
         hButtonListMembers = CreateWindow(L"BUTTON", L"List Members",
             WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-            10, 350, 150, 30,
+            10, 400, 150, 30, // Adjusted position
             hWnd, (HMENU)IDC_BTN_LIST_MEMBERS, g_hInst, NULL);
 
         // Create a dropdown listbox to display members.
         hListMembers = CreateWindow(L"COMBOBOX", L"",
             WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL,
-            170, 350, 310, 150,
+            170, 400, 310, 150, // Adjusted position
             hWnd, (HMENU)IDC_LIST_MEMBERS, g_hInst, NULL);
 
         break;
@@ -280,7 +301,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_COMMAND:
     {
         int wmId = LOWORD(wParam);
-        // Handle the Create Object button.
+
+        // Handle radio button toggling
+        if (wmId == IDC_RADIO_DISPATCH || wmId == IDC_RADIO_DIRECT)
+        {
+            // Toggle the radio buttons
+            SendMessage(hRadioDispatch, BM_SETCHECK, (wmId == IDC_RADIO_DISPATCH) ? BST_CHECKED : BST_UNCHECKED, 0);
+            SendMessage(hRadioDirect, BM_SETCHECK, (wmId == IDC_RADIO_DIRECT) ? BST_CHECKED : BST_UNCHECKED, 0);
+        }
+
+        // Handle the Create Object button
         if (wmId == IDC_BTN_CREATE)
         {
             int sel = (int)SendMessage(hList, LB_GETCURSEL, 0, 0);
@@ -293,39 +323,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
             if (selectedObj.hasUI)
             {
-                // For objects with a UI, instantiate an ActiveX control in the panel.
                 CreateActiveXControl(selectedObj.progID.c_str());
-                    // Add the definition of the CreateActiveXControl function to resolve the undefined identifier error.
             }
             else
             {
-                // For non-UI objects, determine which call mode to use.
                 bool useDispatch = (SendMessage(hRadioDispatch, BM_GETCHECK, 0, 0) == BST_CHECKED);
                 CreateCOMObject(selectedObj, useDispatch);
             }
         }
-        // Handle the Invoke Method button.
-        else if (wmId == IDC_BTN_INVOKE)
-        {
-            InvokeDispatchMethod();
-        }
-        // Handle the List Members button.
-        else if (wmId == IDC_BTN_LIST_MEMBERS)
-        {
-            // Clear the dropdown listbox.
-            SendMessage(hListMembers, CB_RESETCONTENT, 0, 0);
-
-            // Add placeholder items (actual member listing will be implemented later).
-            SendMessage(hListMembers, CB_ADDSTRING, 0, (LPARAM)L"Method1()");
-            SendMessage(hListMembers, CB_ADDSTRING, 0, (LPARAM)L"Property1");
-            SendMessage(hListMembers, CB_ADDSTRING, 0, (LPARAM)L"Method2(int param)");
-            SendMessage(hListMembers, CB_ADDSTRING, 0, (LPARAM)L"Property2");
-
-            // Optionally, select the first item.
-            SendMessage(hListMembers, CB_SETCURSEL, 0, 0);
-        }
         break;
     }
+
     case WM_DESTROY:
         PostQuitMessage(0);
         break;
