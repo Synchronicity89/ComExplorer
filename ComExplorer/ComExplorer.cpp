@@ -47,6 +47,66 @@ HWND hCheckboxUIOnly = NULL;
 // Global COM pointer for storing the automation object’s IDispatch interface.
 CComPtr<IDispatch> g_pDispatch;
 
+void PopulateCallableMembers()
+{
+    if (!g_pDispatch)
+    {
+        MessageBox(NULL, L"No COM object available to enumerate members.", L"Error", MB_OK);
+        return;
+    }
+
+    // Get the ITypeInfo interface from the IDispatch interface.
+    CComPtr<ITypeInfo> spTypeInfo;
+    HRESULT hr = g_pDispatch->GetTypeInfo(0, LOCALE_USER_DEFAULT, &spTypeInfo);
+    if (FAILED(hr))
+    {
+        MessageBox(NULL, L"Failed to retrieve type information from IDispatch.", L"Error", MB_OK);
+        return;
+    }
+
+    // Get the type attributes.
+    TYPEATTR* pTypeAttr = nullptr;
+    hr = spTypeInfo->GetTypeAttr(&pTypeAttr);
+    if (FAILED(hr))
+    {
+        MessageBox(NULL, L"Failed to retrieve type attributes from ITypeInfo.", L"Error", MB_OK);
+        return;
+    }
+
+    // Clear the listbox.
+    SendMessage(hListMembers, CB_RESETCONTENT, 0, 0);
+
+    // Iterate through the members.
+    for (UINT i = 0; i < pTypeAttr->cFuncs; ++i)
+    {
+        FUNCDESC* pFuncDesc = nullptr;
+        hr = spTypeInfo->GetFuncDesc(i, &pFuncDesc);
+        if (SUCCEEDED(hr))
+        {
+            // Get the name of the member.
+            BSTR bstrName = nullptr;
+            UINT cNames = 0;
+            hr = spTypeInfo->GetNames(pFuncDesc->memid, &bstrName, 1, &cNames);
+            if (SUCCEEDED(hr) && cNames > 0)
+            {
+                // Add the member name to the listbox.
+                SendMessage(hListMembers, CB_ADDSTRING, 0, (LPARAM)bstrName);
+                SysFreeString(bstrName);
+            }
+
+            // Release the function description.
+            spTypeInfo->ReleaseFuncDesc(pFuncDesc);
+        }
+    }
+
+    // Release the type attributes.
+    spTypeInfo->ReleaseTypeAttr(pTypeAttr);
+
+    // Optionally, select the first item.
+    SendMessage(hListMembers, CB_SETCURSEL, 0, 0);
+}
+
+
 void InvokeDispatchMethod()
 {
     if (!g_pDispatch)
@@ -334,6 +394,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_COMMAND:
     {
         int wmId = LOWORD(wParam);
+
+        // Handle the "List Members" button.
+        if (wmId == IDC_BTN_LIST_MEMBERS)
+        {
+            PopulateCallableMembers();
+        }
 
         // Handle radio button toggling
         if (wmId == IDC_RADIO_DISPATCH || wmId == IDC_RADIO_DIRECT)
