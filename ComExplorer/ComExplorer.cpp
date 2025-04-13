@@ -222,6 +222,7 @@ void CreateCOMObject(const ComObjectInfo& info, bool useDispatch)
 {
     // Clear any previous instance.
     g_pDispatch.Release();
+    g_pUnknown.Release();
 
     // Determine if the input is a CLSID or ProgID.
     std::wstring identifier = info.progID;
@@ -282,14 +283,13 @@ void CreateCOMObject(const ComObjectInfo& info, bool useDispatch)
     else
     {
         // Use CComPtr to create the COM object and request IUnknown.
-        CComPtr<IUnknown> pUnk;
-        hr = pUnk.CoCreateInstance(clsid, nullptr, CLSCTX_INPROC_SERVER);
+        hr = g_pUnknown.CoCreateInstance(clsid, nullptr, CLSCTX_INPROC_SERVER);
         if (SUCCEEDED(hr))
         {
             MessageBox(NULL, L"COM object created with IUnknown successfully.", L"Success", MB_OK);
 
             // Optionally query for IDispatch.
-            hr = pUnk->QueryInterface(IID_IDispatch, (void**)&g_pDispatch);
+            hr = g_pUnknown->QueryInterface(IID_IDispatch, (void**)&g_pDispatch);
             if (SUCCEEDED(hr))
             {
                 MessageBox(NULL, L"IDispatch is also available on this object.", L"Success", MB_OK);
@@ -572,7 +572,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     // Create the main application window.
     HWND hWnd = CreateWindow(L"COMExplorerWindowClass", L"COM and ActiveX Explorer",
         WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, 0, 750, 400,
+        CW_USEDEFAULT, 0, 750, 500,
         NULL, NULL, hInstance, NULL);
     if (!hWnd)
     {
