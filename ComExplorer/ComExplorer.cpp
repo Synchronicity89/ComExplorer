@@ -46,77 +46,140 @@ HWND hCheckboxUIOnly = NULL;
 
 // Global COM pointer for storing the automation object’s IDispatch interface.
 CComPtr<IDispatch> g_pDispatch;
+CComPtr<IUnknown> g_pUnknown; // Global pointer for non-IDispatch objects
 
 void PopulateCallableMembers()
 {
-    if (!g_pDispatch)
+    if (g_pDispatch)
+    {
+        // Existing logic for IDispatch objects
+        CComPtr<ITypeInfo> spTypeInfo;
+        HRESULT hr = g_pDispatch->GetTypeInfo(0, LOCALE_USER_DEFAULT, &spTypeInfo);
+        if (FAILED(hr))
+        {
+            MessageBox(NULL, L"Failed to retrieve type information from IDispatch.", L"Error", MB_OK);
+            return;
+        }
+
+        // Get the type attributes of the default interface.
+        TYPEATTR* pTypeAttr = nullptr;
+        hr = spTypeInfo->GetTypeAttr(&pTypeAttr);
+        if (FAILED(hr))
+        {
+            MessageBox(NULL, L"Failed to retrieve type attributes from ITypeInfo.", L"Error", MB_OK);
+            return;
+        }
+
+        // Clear the listbox.
+        SendMessage(hListMembers, CB_RESETCONTENT, 0, 0);
+
+        // Enumerate methods and properties (existing logic)
+        for (UINT i = 0; i < pTypeAttr->cFuncs; ++i)
+        {
+            FUNCDESC* pFuncDesc = nullptr;
+            hr = spTypeInfo->GetFuncDesc(i, &pFuncDesc);
+            if (SUCCEEDED(hr))
+            {
+                BSTR bstrName = nullptr;
+                if (SUCCEEDED(spTypeInfo->GetDocumentation(pFuncDesc->memid, &bstrName, nullptr, nullptr, nullptr)))
+                {
+                    SendMessage(hListMembers, CB_ADDSTRING, 0, (LPARAM)bstrName);
+                    SysFreeString(bstrName);
+                }
+                spTypeInfo->ReleaseFuncDesc(pFuncDesc);
+            }
+        }
+
+        for (UINT i = 0; i < pTypeAttr->cVars; ++i)
+        {
+            VARDESC* pVarDesc = nullptr;
+            hr = spTypeInfo->GetVarDesc(i, &pVarDesc);
+            if (SUCCEEDED(hr))
+            {
+                BSTR bstrName = nullptr;
+                if (SUCCEEDED(spTypeInfo->GetDocumentation(pVarDesc->memid, &bstrName, nullptr, nullptr, nullptr)))
+                {
+                    SendMessage(hListMembers, CB_ADDSTRING, 0, (LPARAM)bstrName);
+                    SysFreeString(bstrName);
+                }
+                spTypeInfo->ReleaseVarDesc(pVarDesc);
+            }
+        }
+
+        spTypeInfo->ReleaseTypeAttr(pTypeAttr);
+        SendMessage(hListMembers, CB_SETCURSEL, 0, 0);
+    }
+    else if (g_pUnknown)
+    {
+        // New logic for non-IDispatch objects
+        CComPtr<IProvideClassInfo> spClassInfo;
+        HRESULT hr = g_pUnknown->QueryInterface(IID_IProvideClassInfo, (void**)&spClassInfo);
+        if (FAILED(hr))
+        {
+            MessageBox(NULL, L"Failed to retrieve class information from IUnknown.", L"Error", MB_OK);
+            return;
+        }
+
+        CComPtr<ITypeInfo> spTypeInfo;
+        hr = spClassInfo->GetClassInfo(&spTypeInfo);
+        if (FAILED(hr))
+        {
+            MessageBox(NULL, L"Failed to retrieve type information from IProvideClassInfo.", L"Error", MB_OK);
+            return;
+        }
+
+        // Get the type attributes of the class.
+        TYPEATTR* pTypeAttr = nullptr;
+        hr = spTypeInfo->GetTypeAttr(&pTypeAttr);
+        if (FAILED(hr))
+        {
+            MessageBox(NULL, L"Failed to retrieve type attributes from ITypeInfo.", L"Error", MB_OK);
+            return;
+        }
+
+        // Clear the listbox.
+        SendMessage(hListMembers, CB_RESETCONTENT, 0, 0);
+
+        // Enumerate methods and properties (similar to IDispatch logic)
+        for (UINT i = 0; i < pTypeAttr->cFuncs; ++i)
+        {
+            FUNCDESC* pFuncDesc = nullptr;
+            hr = spTypeInfo->GetFuncDesc(i, &pFuncDesc);
+            if (SUCCEEDED(hr))
+            {
+                BSTR bstrName = nullptr;
+                if (SUCCEEDED(spTypeInfo->GetDocumentation(pFuncDesc->memid, &bstrName, nullptr, nullptr, nullptr)))
+                {
+                    SendMessage(hListMembers, CB_ADDSTRING, 0, (LPARAM)bstrName);
+                    SysFreeString(bstrName);
+                }
+                spTypeInfo->ReleaseFuncDesc(pFuncDesc);
+            }
+        }
+
+        for (UINT i = 0; i < pTypeAttr->cVars; ++i)
+        {
+            VARDESC* pVarDesc = nullptr;
+            hr = spTypeInfo->GetVarDesc(i, &pVarDesc);
+            if (SUCCEEDED(hr))
+            {
+                BSTR bstrName = nullptr;
+                if (SUCCEEDED(spTypeInfo->GetDocumentation(pVarDesc->memid, &bstrName, nullptr, nullptr, nullptr)))
+                {
+                    SendMessage(hListMembers, CB_ADDSTRING, 0, (LPARAM)bstrName);
+                    SysFreeString(bstrName);
+                }
+                spTypeInfo->ReleaseVarDesc(pVarDesc);
+            }
+        }
+
+        spTypeInfo->ReleaseTypeAttr(pTypeAttr);
+        SendMessage(hListMembers, CB_SETCURSEL, 0, 0);
+    }
+    else
     {
         MessageBox(NULL, L"No COM object available to enumerate members.", L"Error", MB_OK);
-        return;
     }
-
-    // Get the ITypeInfo interface from the IDispatch interface.
-    CComPtr<ITypeInfo> spTypeInfo;
-    HRESULT hr = g_pDispatch->GetTypeInfo(0, LOCALE_USER_DEFAULT, &spTypeInfo);
-    if (FAILED(hr))
-    {
-        MessageBox(NULL, L"Failed to retrieve type information from IDispatch.", L"Error", MB_OK);
-        return;
-    }
-
-    // Get the type attributes of the default interface.
-    TYPEATTR* pTypeAttr = nullptr;
-    hr = spTypeInfo->GetTypeAttr(&pTypeAttr);
-    if (FAILED(hr))
-    {
-        MessageBox(NULL, L"Failed to retrieve type attributes from ITypeInfo.", L"Error", MB_OK);
-        return;
-    }
-
-    // Clear the listbox.
-    SendMessage(hListMembers, CB_RESETCONTENT, 0, 0);
-
-    // Enumerate methods.
-    for (UINT i = 0; i < pTypeAttr->cFuncs; ++i)
-    {
-        FUNCDESC* pFuncDesc = nullptr;
-        hr = spTypeInfo->GetFuncDesc(i, &pFuncDesc);
-        if (SUCCEEDED(hr))
-        {
-            BSTR bstrName = nullptr;
-            if (SUCCEEDED(spTypeInfo->GetDocumentation(pFuncDesc->memid, &bstrName, nullptr, nullptr, nullptr)))
-            {
-                // Add the method name to the listbox.
-                SendMessage(hListMembers, CB_ADDSTRING, 0, (LPARAM)bstrName);
-                SysFreeString(bstrName);
-            }
-            spTypeInfo->ReleaseFuncDesc(pFuncDesc);
-        }
-    }
-
-    // Enumerate properties.
-    for (UINT i = 0; i < pTypeAttr->cVars; ++i)
-    {
-        VARDESC* pVarDesc = nullptr;
-        hr = spTypeInfo->GetVarDesc(i, &pVarDesc);
-        if (SUCCEEDED(hr))
-        {
-            BSTR bstrName = nullptr;
-            if (SUCCEEDED(spTypeInfo->GetDocumentation(pVarDesc->memid, &bstrName, nullptr, nullptr, nullptr)))
-            {
-                // Add the property name to the listbox.
-                SendMessage(hListMembers, CB_ADDSTRING, 0, (LPARAM)bstrName);
-                SysFreeString(bstrName);
-            }
-            spTypeInfo->ReleaseVarDesc(pVarDesc);
-        }
-    }
-
-    // Release the type attributes.
-    spTypeInfo->ReleaseTypeAttr(pTypeAttr);
-
-    // Optionally, select the first item.
-    SendMessage(hListMembers, CB_SETCURSEL, 0, 0);
 }
 
 
