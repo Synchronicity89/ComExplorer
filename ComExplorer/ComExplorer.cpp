@@ -228,11 +228,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         // Create a checkbox for "UI Only"
         hCheckboxUIOnly = CreateWindow(L"BUTTON", L"UI Only",
             WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
-            10, 130, 100, 20, // Adjusted position to ensure visibility
+            10, 130, 100, 20,
             hWnd, (HMENU)110, g_hInst, NULL);
 
         // Set the checkbox to checked by default
         SendMessage(hCheckboxUIOnly, BM_SETCHECK, BST_CHECKED, 0);
+
+        // Create a Refresh button
+        HWND hButtonRefresh = CreateWindow(L"BUTTON", L"Refresh",
+            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+            120, 130, 100, 20,
+            hWnd, (HMENU)111, g_hInst, NULL);
 
         // Populate the listbox with "UI Only" COM objects by default
         g_ComObjects = EnumerateCOMObjects();
@@ -250,11 +256,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         // Create two radio buttons to select call mode.
         hRadioDispatch = CreateWindow(L"BUTTON", L"IDispatch",
             WS_CHILD | WS_VISIBLE | BS_RADIOBUTTON,
-            10, 160, 100, 25, // Adjusted position
+            10, 160, 100, 25,
             hWnd, (HMENU)IDC_RADIO_DISPATCH, g_hInst, NULL);
         hRadioDirect = CreateWindow(L"BUTTON", L"Direct",
             WS_CHILD | WS_VISIBLE | BS_RADIOBUTTON,
-            120, 160, 100, 25, // Adjusted position
+            120, 160, 100, 25,
             hWnd, (HMENU)IDC_RADIO_DIRECT, g_hInst, NULL);
         // Default to using IDispatch.
         SendMessage(hRadioDispatch, BM_SETCHECK, BST_CHECKED, 0);
@@ -263,19 +269,19 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         // Create a button to instantiate the selected COM object.
         hButtonCreate = CreateWindow(L"BUTTON", L"Create Object",
             WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-            10, 200, 150, 30, // Adjusted position
+            10, 200, 150, 30,
             hWnd, (HMENU)IDC_BTN_CREATE, g_hInst, NULL);
 
         // Create a button to invoke a method on the object.
         hButtonInvoke = CreateWindow(L"BUTTON", L"Invoke Method",
             WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-            170, 200, 150, 30, // Adjusted position
+            170, 200, 150, 30,
             hWnd, (HMENU)IDC_BTN_INVOKE, g_hInst, NULL);
 
         // Create an Edit control to display output messages.
         hEditOutput = CreateWindow(L"EDIT", L"",
             WS_CHILD | WS_VISIBLE | WS_BORDER | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY,
-            10, 240, 310, 150, // Adjusted position
+            10, 240, 310, 150,
             hWnd, (HMENU)IDC_EDIT_OUTPUT, g_hInst, NULL);
 
         // Create a panel that will host the ActiveX control (if needed).
@@ -287,13 +293,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         // Create a button to list members of the selected COM object.
         hButtonListMembers = CreateWindow(L"BUTTON", L"List Members",
             WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-            10, 400, 150, 30, // Adjusted position
+            10, 400, 150, 30,
             hWnd, (HMENU)IDC_BTN_LIST_MEMBERS, g_hInst, NULL);
 
         // Create a dropdown listbox to display members.
         hListMembers = CreateWindow(L"COMBOBOX", L"",
             WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL,
-            170, 400, 310, 150, // Adjusted position
+            170, 400, 310, 150,
             hWnd, (HMENU)IDC_LIST_MEMBERS, g_hInst, NULL);
 
         break;
@@ -308,6 +314,28 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             // Toggle the radio buttons
             SendMessage(hRadioDispatch, BM_SETCHECK, (wmId == IDC_RADIO_DISPATCH) ? BST_CHECKED : BST_UNCHECKED, 0);
             SendMessage(hRadioDirect, BM_SETCHECK, (wmId == IDC_RADIO_DIRECT) ? BST_CHECKED : BST_UNCHECKED, 0);
+        }
+
+        // Handle the Refresh button or checkbox state change
+        if (wmId == 110 || wmId == 111) // Checkbox or Refresh button
+        {
+            // Repopulate the listbox
+            BOOL isChecked = (SendMessage(hCheckboxUIOnly, BM_GETCHECK, 0, 0) == BST_CHECKED);
+
+            // Clear the listbox
+            SendMessage(hList, LB_RESETCONTENT, 0, 0);
+
+            // Repopulate the listbox based on the checkbox state
+            for (const auto& obj : g_ComObjects)
+            {
+                if (!isChecked || obj.hasUI) // Add all objects if unchecked, or only UI objects if checked
+                {
+                    SendMessage(hList, LB_ADDSTRING, 0, (LPARAM)obj.displayName.c_str());
+                }
+            }
+
+            // Select the first item by default
+            SendMessage(hList, LB_SETCURSEL, 0, 0);
         }
 
         // Handle the Create Object button
@@ -333,7 +361,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
         break;
     }
-
     case WM_DESTROY:
         PostQuitMessage(0);
         break;
