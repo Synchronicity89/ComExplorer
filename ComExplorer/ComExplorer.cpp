@@ -64,7 +64,7 @@ void PopulateCallableMembers()
         return;
     }
 
-    // Get the type attributes.
+    // Get the type attributes of the default interface.
     TYPEATTR* pTypeAttr = nullptr;
     hr = spTypeInfo->GetTypeAttr(&pTypeAttr);
     if (FAILED(hr))
@@ -76,26 +76,39 @@ void PopulateCallableMembers()
     // Clear the listbox.
     SendMessage(hListMembers, CB_RESETCONTENT, 0, 0);
 
-    // Iterate through the members.
+    // Enumerate methods.
     for (UINT i = 0; i < pTypeAttr->cFuncs; ++i)
     {
         FUNCDESC* pFuncDesc = nullptr;
         hr = spTypeInfo->GetFuncDesc(i, &pFuncDesc);
         if (SUCCEEDED(hr))
         {
-            // Get the name of the member.
             BSTR bstrName = nullptr;
-            UINT cNames = 0;
-            hr = spTypeInfo->GetNames(pFuncDesc->memid, &bstrName, 1, &cNames);
-            if (SUCCEEDED(hr) && cNames > 0)
+            if (SUCCEEDED(spTypeInfo->GetDocumentation(pFuncDesc->memid, &bstrName, nullptr, nullptr, nullptr)))
             {
-                // Add the member name to the listbox.
+                // Add the method name to the listbox.
                 SendMessage(hListMembers, CB_ADDSTRING, 0, (LPARAM)bstrName);
                 SysFreeString(bstrName);
             }
-
-            // Release the function description.
             spTypeInfo->ReleaseFuncDesc(pFuncDesc);
+        }
+    }
+
+    // Enumerate properties.
+    for (UINT i = 0; i < pTypeAttr->cVars; ++i)
+    {
+        VARDESC* pVarDesc = nullptr;
+        hr = spTypeInfo->GetVarDesc(i, &pVarDesc);
+        if (SUCCEEDED(hr))
+        {
+            BSTR bstrName = nullptr;
+            if (SUCCEEDED(spTypeInfo->GetDocumentation(pVarDesc->memid, &bstrName, nullptr, nullptr, nullptr)))
+            {
+                // Add the property name to the listbox.
+                SendMessage(hListMembers, CB_ADDSTRING, 0, (LPARAM)bstrName);
+                SysFreeString(bstrName);
+            }
+            spTypeInfo->ReleaseVarDesc(pVarDesc);
         }
     }
 
