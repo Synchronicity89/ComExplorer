@@ -87,24 +87,49 @@ void CreateCOMObject(const ComObjectInfo& info, bool useDispatch)
     // Clear any previous instance.
     g_pDispatch.Release();
 
-    // Convert the ProgID to a CLSID.
-    CLSID clsid;// Convert the std::wstring to LPCOLESTR
-	//assign a new c string variable with info.progID.c_str()
-    std::wstring progIDws = info.progID;
-    if (!progIDws.empty() && progIDws.front() == L'{' && progIDws.back() == L'}')
+    // Determine if the input is a CLSID or ProgID.
+    std::wstring identifier = info.progID;
+
+    // Log the original identifier
+    wchar_t logBuffer[256];
+    swprintf_s(logBuffer, L"Original Identifier: %s", identifier.c_str());
+    MessageBox(NULL, logBuffer, L"Debug", MB_OK);
+
+    CLSID clsid;
+    HRESULT hr;
+
+    // Check if the identifier is a CLSID (starts and ends with braces).
+    if (!identifier.empty() && identifier.front() == L'{' && identifier.back() == L'}')
     {
-        progIDws = progIDws.substr(1, progIDws.size() - 2); // Remove the first and last characters.
+        // Use CLSIDFromString for CLSIDs.
+        hr = CLSIDFromString(identifier.c_str(), &clsid);
+        if (FAILED(hr))
+        {
+            swprintf_s(logBuffer, L"Failed to retrieve CLSID from string: %s (HRESULT: 0x%08X)", identifier.c_str(), hr);
+            MessageBox(NULL, logBuffer, L"Error", MB_OK);
+            return;
+        }
     }
-	LPOLESTR progID = const_cast<LPOLESTR>(progIDws.c_str());
-    HRESULT hr = CLSIDFromProgID(progID, &clsid);
-    if (FAILED(hr))
+    else
     {
-        wchar_t buffer[256];
-        swprintf_s(buffer, L"Failed to retrieve CLSID from ProgID: %s", progID);
-        MessageBox(NULL, buffer, L"Error", MB_OK);
-        return;
+        // Use CLSIDFromProgID for ProgIDs.
+        hr = CLSIDFromProgID(identifier.c_str(), &clsid);
+        if (FAILED(hr))
+        {
+            swprintf_s(logBuffer, L"Failed to retrieve CLSID from ProgID: %s (HRESULT: 0x%08X)", identifier.c_str(), hr);
+            MessageBox(NULL, logBuffer, L"Error", MB_OK);
+            return;
+        }
     }
 
+    // Log the resolved CLSID.
+    LPOLESTR clsidString;
+    StringFromCLSID(clsid, &clsidString);
+    swprintf_s(logBuffer, L"Resolved CLSID: %s", clsidString);
+    MessageBox(NULL, logBuffer, L"Debug", MB_OK);
+    CoTaskMemFree(clsidString);
+
+    // Create the COM object.
     if (useDispatch)
     {
         // Use CComPtr to create the COM object and request IDispatch.
@@ -144,6 +169,8 @@ void CreateCOMObject(const ComObjectInfo& info, bool useDispatch)
         }
     }
 }
+
+
 
 
 void CreateActiveXControl(const wchar_t* progID)
